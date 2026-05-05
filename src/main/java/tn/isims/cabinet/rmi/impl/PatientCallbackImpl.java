@@ -4,8 +4,10 @@ import tn.isims.cabinet.rmi.callback.PatientCallback;
 
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
+import java.io.Serial;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Collections;
 
 /**
  * Implémentation du callback patient
@@ -13,9 +15,10 @@ import java.util.List;
  */
 public class PatientCallbackImpl extends UnicastRemoteObject implements PatientCallback {
 
+    @Serial
     private static final long serialVersionUID = 1L;
     private final Long patientId;
-    private final List<String> notifications = new ArrayList<>();
+    private final List<String> notifications = Collections.synchronizedList(new ArrayList<>());
 
     public PatientCallbackImpl(Long patientId) throws RemoteException {
         super();
@@ -46,7 +49,9 @@ public class PatientCallbackImpl extends UnicastRemoteObject implements PatientC
      * @return Liste des notifications
      */
     public List<String> getNotifications() {
-        return new ArrayList<>(notifications);
+        synchronized (notifications) {
+            return new ArrayList<>(notifications);
+        }
     }
 
     /**
@@ -54,7 +59,11 @@ public class PatientCallbackImpl extends UnicastRemoteObject implements PatientC
      * @return Liste des notifications non lues
      */
     public List<String> getNotificationsNonLues() {
-        return new ArrayList<>(notifications);
+        synchronized (notifications) {
+            List<String> copies = new ArrayList<>(notifications);
+            notifications.clear();
+            return copies;
+        }
     }
 
     private void logNotification(String notification) {

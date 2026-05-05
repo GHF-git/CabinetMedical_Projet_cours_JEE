@@ -85,6 +85,13 @@
             <version>2.0.7</version>
         </dependency>
 
+        <!-- WildFly Remote Naming for RMI JNDI lookups -->
+        <dependency>
+            <groupId>org.wildfly</groupId>
+            <artifactId>wildfly-client-all</artifactId>
+            <version>27.0.0.Final</version>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

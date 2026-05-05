@@ -25,32 +25,40 @@ public class PatientServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res)
             throws ServletException, IOException {
-        transferFlash(req);
-        String pathInfo = req.getPathInfo();
-        String action = (pathInfo != null && pathInfo.length() > 1) ? pathInfo.substring(1) : "";
+        try {
+            transferFlash(req);
+            String pathInfo = req.getPathInfo();
+            String action = (pathInfo != null && pathInfo.length() > 1) ? pathInfo.substring(1) : "";
 
-        switch (action) {
-            case "add":    afficherFormulaireAjout(req, res); break;
-            case "edit":   afficherFormulaireModification(req, res); break;
-            case "search": rechercherPatients(req, res); break;
-            default:       listerPatients(req, res);
+            switch (action) {
+                case "add":    afficherFormulaireAjout(req, res); break;
+                case "edit":   afficherFormulaireModification(req, res); break;
+                case "search": rechercherPatients(req, res); break;
+                default:       listerPatients(req, res);
+            }
+        } catch (Exception e) {
+            handleError(req, res, "Erreur lors du chargement des patients : " + e.getMessage());
         }
     }
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse res)
             throws ServletException, IOException {
-        String pathInfo = req.getPathInfo();
-        String action = (pathInfo != null && pathInfo.length() > 1)
-            ? pathInfo.substring(1)
-            : req.getParameter("action") != null ? req.getParameter("action") : "";
+        try {
+            String pathInfo = req.getPathInfo();
+            String action = (pathInfo != null && pathInfo.length() > 1)
+                ? pathInfo.substring(1)
+                : req.getParameter("action") != null ? req.getParameter("action") : "";
 
-        switch (action) {
-            case "add":
-            case "save":   sauvegarderPatient(req, res); break;
-            case "edit":   sauvegarderPatient(req, res); break;
-            case "delete": supprimerPatient(req, res); break;
-            default:       res.sendRedirect(req.getContextPath() + "/patients");
+            switch (action) {
+                case "add":
+                case "save":   sauvegarderPatient(req, res); break;
+                case "edit":   sauvegarderPatient(req, res); break;
+                case "delete": supprimerPatient(req, res); break;
+                default:       res.sendRedirect(req.getContextPath() + "/patients");
+            }
+        } catch (Exception e) {
+            handleError(req, res, "Erreur lors du traitement des patients : " + e.getMessage());
         }
     }
 
@@ -139,5 +147,11 @@ public class PatientServlet extends HttpServlet {
                 s.removeAttribute("flashType");
             }
         }
+    }
+
+    private void handleError(HttpServletRequest req, HttpServletResponse res, String message)
+            throws IOException {
+        flash(req, "error", message);
+        res.sendRedirect(req.getContextPath() + "/patients");
     }
 }

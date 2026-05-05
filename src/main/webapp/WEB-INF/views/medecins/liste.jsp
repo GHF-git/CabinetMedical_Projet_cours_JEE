@@ -12,7 +12,7 @@
   <form method="get" action="${pageContext.request.contextPath}/medecins/search" class="search-form">
     <div class="search-group">
       <input type="text" name="specialite" placeholder="🔍  Rechercher par spécialité..."
-             value="${specialite}" class="search-input">
+             value="${not empty specialiteSelectionnee ? specialiteSelectionnee : specialite}" class="search-input">
       <button type="submit" class="btn btn-primary">Rechercher</button>
       <a href="${pageContext.request.contextPath}/medecins" class="btn btn-secondary">Réinitialiser</a>
     </div>

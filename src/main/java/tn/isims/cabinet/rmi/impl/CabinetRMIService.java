@@ -2,12 +2,14 @@ package tn.isims.cabinet.rmi.impl;
 
 import tn.isims.cabinet.ejb.patient.PatientServiceRemote;
 import tn.isims.cabinet.ejb.rendezvous.RendezVousServiceRemote;
-import tn.isims.cabinet.entity.Patient;
+import tn.isims.cabinet.ejb.medecin.MedecinServiceRemote;
 import tn.isims.cabinet.entity.RendezVous;
+import tn.isims.cabinet.entity.Medecin;
 import tn.isims.cabinet.rmi.callback.PatientCallback;
 
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
+import java.io.Serial;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.time.LocalDateTime;
@@ -16,6 +18,7 @@ import java.util.Properties;
 
 public class CabinetRMIService extends UnicastRemoteObject implements CabinetRMIServiceRemote {
 
+    @Serial
     private static final long serialVersionUID = 1L;
 
     // JNDI names for WildFly remote lookup
@@ -23,6 +26,8 @@ public class CabinetRMIService extends UnicastRemoteObject implements CabinetRMI
         "java:global/CabinetMedical/PatientService!tn.isims.cabinet.ejb.patient.PatientServiceRemote";
     private static final String RDV_JNDI =
         "java:global/CabinetMedical/RendezVousService!tn.isims.cabinet.ejb.rendezvous.RendezVousServiceRemote";
+    private static final String MEDECIN_JNDI =
+        "java:global/CabinetMedical/MedecinService!tn.isims.cabinet.ejb.medecin.MedecinServiceRemote";
 
     public CabinetRMIService() throws RemoteException {
         super();
@@ -32,12 +37,23 @@ public class CabinetRMIService extends UnicastRemoteObject implements CabinetRMI
 
     private InitialContext buildContext() throws NamingException {
         Properties p = new Properties();
+        // Configure for remote JNDI connection to WildFly
+        // This is used when RMI server runs outside WildFly
         p.put("java.naming.factory.initial",
               "org.jboss.naming.remote.client.InitialContextFactory");
         p.put("java.naming.provider.url", "http-remoting://localhost:8080");
         p.put("java.naming.security.principal", "admin");
         p.put("java.naming.security.credentials", "admin123");
-        return new InitialContext(p);
+
+        System.out.println("[DEBUG] Building JNDI context for: " + p.get("java.naming.provider.url"));
+        try {
+            InitialContext ctx = new InitialContext(p);
+            System.out.println("[DEBUG] JNDI context created successfully");
+            return ctx;
+        } catch (NamingException e) {
+            System.err.println("[ERROR] Failed to create JNDI context: " + e.getMessage());
+            throw new NamingException("Cannot create JNDI context: " + e.getMessage());
+        }
     }
 
     private PatientServiceRemote getPatientService() throws RemoteException {
@@ -56,6 +72,14 @@ public class CabinetRMIService extends UnicastRemoteObject implements CabinetRMI
         }
     }
 
+    private MedecinServiceRemote getMedecinService() throws RemoteException {
+        try {
+            return (MedecinServiceRemote) buildContext().lookup(MEDECIN_JNDI);
+        } catch (Exception e) {
+            throw new RemoteException("MedecinService introuvable: " + e.getMessage(), e);
+        }
+    }
+
     // ── Notifications ─────────────────────────────────────────────────────────
 
     @Override
@@ -67,6 +91,19 @@ public class CabinetRMIService extends UnicastRemoteObject implements CabinetRMI
             "CONFIRMATION: Vous êtes maintenant inscrit aux notifications du cabinet médical."
         );
         return true;
+    }
+
+    // ── Doctors ──────────────────────────────────────────────────────────────
+
+    @Override
+    public List<Medecin> listerTousLesMedecins() throws RemoteException {
+        System.out.println("RMI: Récupération de la liste de tous les médecins");
+        try {
+            return getMedecinService().listerTousLesMedecins();
+        } catch (Exception e) {
+            System.err.println("[RMI] Erreur récupération médecins: " + e.getMessage());
+            throw new RemoteException("Erreur liste médecins: " + e.getMessage(), e);
+        }
     }
 
     // ── Consultation ─────────────────────────────────────────────────────────

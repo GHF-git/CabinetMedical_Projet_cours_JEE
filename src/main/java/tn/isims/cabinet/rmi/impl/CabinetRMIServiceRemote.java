@@ -1,6 +1,7 @@
 package tn.isims.cabinet.rmi.impl;
 
 import tn.isims.cabinet.entity.RendezVous;
+import tn.isims.cabinet.entity.Medecin;
 import tn.isims.cabinet.rmi.callback.PatientCallback;
 
 import java.rmi.Remote;
@@ -14,10 +15,17 @@ import java.util.List;
 public interface CabinetRMIServiceRemote extends Remote {
 
     /**
+     * Récupère la liste de tous les médecins disponibles
+     * @return Liste des médecins
+     * @throws RemoteException en cas d'erreur RMI
+     */
+    List<Medecin> listerTousLesMedecins() throws RemoteException;
+
+    /**
      * Permet à un patient de consulter ses rendez-vous
      * @param patientId L'ID du patient
      * @return Liste des rendez-vous
-     * @throws RemoteException
+     * @throws RemoteException en cas d'erreur RMI
      */
     List<RendezVous> consulterRendezVous(Long patientId) throws RemoteException;
 
@@ -26,7 +34,7 @@ public interface CabinetRMIServiceRemote extends Remote {
      * @param patientId L'ID du patient
      * @param callback L'interface de callback
      * @return true si l'enregistrement a réussi
-     * @throws RemoteException
+     * @throws RemoteException en cas d'erreur RMI
      */
     boolean sEnregistrerPourNotifications(Long patientId, PatientCallback callback)
             throws RemoteException;
@@ -35,7 +43,7 @@ public interface CabinetRMIServiceRemote extends Remote {
      * Consulte tous les rendez-vous (passés et futurs)
      * @param patientId L'ID du patient
      * @return Liste des rendez-vous
-     * @throws RemoteException
+     * @throws RemoteException en cas d'erreur RMI
      */
     List<RendezVous> consulterRendezVousPassesEtFuturs(Long patientId) throws RemoteException;
 
@@ -46,17 +54,17 @@ public interface CabinetRMIServiceRemote extends Remote {
      * @param dateRendezVous Date et heure du RDV
      * @param motif Motif du rendez-vous
      * @return Message de confirmation
-     * @throws RemoteException
+     * @throws RemoteException en cas d'erreur RMI
      */
     String creerRendezVousRMI(Long patientId, Long medecinId,
-                               LocalDateTime dateRendezVous, String motif) throws RemoteException;
+                                LocalDateTime dateRendezVous, String motif) throws RemoteException;
 
     /**
      * Modifie l'horaire d'un rendez-vous via RMI
      * @param rdvId ID du rendez-vous
      * @param nouvelleDate Nouvelle date et heure
      * @return Message de confirmation
-     * @throws RemoteException
+     * @throws RemoteException en cas d'erreur RMI
      */
     String modifierRendezVousRMI(Long rdvId, LocalDateTime nouvelleDate) throws RemoteException;
 
@@ -64,7 +72,7 @@ public interface CabinetRMIServiceRemote extends Remote {
      * Annule un rendez-vous via RMI
      * @param rdvId ID du rendez-vous
      * @return Message de confirmation
-     * @throws RemoteException
+     * @throws RemoteException en cas d'erreur RMI
      */
     String annulerRendezVousRMI(Long rdvId) throws RemoteException;
 }

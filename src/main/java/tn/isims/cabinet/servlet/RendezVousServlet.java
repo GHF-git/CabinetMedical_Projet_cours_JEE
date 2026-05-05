@@ -38,66 +38,72 @@ public class RendezVousServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        try {
+            // Flush session flash messages into request
+            transferFlash(request);
 
-        // Flush session flash messages into request
-        transferFlash(request);
+            String pathInfo = request.getPathInfo();
+            String action = (pathInfo != null && pathInfo.length() > 1) ? pathInfo.substring(1) : "";
 
-        String pathInfo = request.getPathInfo();
-        String action = (pathInfo != null && pathInfo.length() > 1) ? pathInfo.substring(1) : "";
-
-        switch (action) {
-            case "add":
-                afficherFormulaireCreation(request, response);
-                break;
-            case "edit":
-                afficherFormulaireModification(request, response);
-                break;
-            case "du-jour":
-                listerRendezVousDuJour(request, response);
-                break;
-            case "passes":
-                listerRendezVousPasses(request, response);
-                break;
-            case "cancel":
-                // Support GET cancel via ?id=
-                doCancel(request, response);
-                break;
-            case "terminate":
-                doTerminate(request, response);
-                break;
-            default:
-                listerTousLesRendezVous(request, response);
+            switch (action) {
+                case "add":
+                    afficherFormulaireCreation(request, response);
+                    break;
+                case "edit":
+                    afficherFormulaireModification(request, response);
+                    break;
+                case "du-jour":
+                    listerRendezVousDuJour(request, response);
+                    break;
+                case "passes":
+                    listerRendezVousPasses(request, response);
+                    break;
+                case "cancel":
+                    // Support GET cancel via ?id=
+                    doCancel(request, response);
+                    break;
+                case "terminate":
+                    doTerminate(request, response);
+                    break;
+                default:
+                    listerTousLesRendezVous(request, response);
+            }
+        } catch (Exception e) {
+            handleError(request, response, "Erreur lors du chargement des rendez-vous : " + e.getMessage());
         }
     }
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        try {
+            String pathInfo = request.getPathInfo();
+            String pathAction = (pathInfo != null && pathInfo.length() > 1) ? pathInfo.substring(1) : "";
+            String paramAction = request.getParameter("action");
 
-        String pathInfo = request.getPathInfo();
-        String pathAction = (pathInfo != null && pathInfo.length() > 1) ? pathInfo.substring(1) : "";
-        String paramAction = request.getParameter("action");
+            // Support both path-based and param-based action routing
+            String action = !pathAction.isEmpty() ? pathAction : (paramAction != null ? paramAction : "");
 
-        // Support both path-based and param-based action routing
-        String action = !pathAction.isEmpty() ? pathAction : (paramAction != null ? paramAction : "");
-
-        switch (action) {
-            case "add":
-            case "create":
-                creerRendezVous(request, response);
-                break;
-            case "edit":
-            case "update":
-                modifierRendezVous(request, response);
-                break;
-            case "cancel":
-                doCancel(request, response);
-                break;
-            case "terminate":
-                doTerminate(request, response);
-                break;
-            default:
-                response.sendRedirect(request.getContextPath() + "/rendezvous");
+            switch (action) {
+                case "add":
+                case "create":
+                    creerRendezVous(request, response);
+                    break;
+                case "edit":
+                case "update":
+                    modifierRendezVous(request, response);
+                    break;
+                case "cancel":
+                    doCancel(request, response);
+                    break;
+                case "terminate":
+                    doTerminate(request, response);
+                    break;
+                default:
+                    response.sendRedirect(request.getContextPath() + "/rendezvous");
+            }
+        } catch (Exception e) {
+            handleError(request, response, "Erreur lors du traitement des rendez-vous : " + e.getMessage());
         }
     }
 
@@ -159,6 +165,7 @@ public class RendezVousServlet extends HttpServlet {
             LocalDateTime date = LocalDateTime.parse(req.getParameter("dateRendezVous"), FORMATTER);
             String motif = req.getParameter("motif");
 
+            System.out.println("[RendezVousServlet] Creating rendez-vous patientId=" + patientId + ", medecinId=" + medecinId + ", date=" + date);
             RendezVous rdv = rendezVousService.creerRendezVous(patientId, medecinId, date, motif);
             flashSuccess(req, "Rendez-vous #" + rdv.getId() + " créé avec succès !");
         } catch (DateTimeParseException e) {
@@ -237,5 +244,12 @@ public class RendezVousServlet extends HttpServlet {
                 s.removeAttribute("flashType");
             }
         }
+    }
+
+    private void handleError(HttpServletRequest req, HttpServletResponse res, String message)
+            throws IOException {
+        System.out.println("[RendezVousServlet] " + message);
+        flashError(req, message);
+        res.sendRedirect(req.getContextPath() + "/rendezvous");
     }
 }

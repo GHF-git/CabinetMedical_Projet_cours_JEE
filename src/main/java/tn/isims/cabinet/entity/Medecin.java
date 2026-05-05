@@ -28,7 +28,7 @@ public class Medecin implements Serializable {
     @Column(name = "email")
     private String email;
 
-    @OneToMany(mappedBy = "medecin", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "medecin", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     private List<RendezVous> rendezVous = new ArrayList<>();
 
     // Constructors
