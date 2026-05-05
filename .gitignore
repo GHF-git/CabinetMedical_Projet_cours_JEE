@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+
+# Java
+target/
+
+# env files
+.env
+
+# logs
+*.log

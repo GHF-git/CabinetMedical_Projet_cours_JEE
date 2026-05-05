@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence xmlns="https://jakarta.ee/xml/ns/persistence"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="https://jakarta.ee/xml/ns/persistence
+                                 https://jakarta.ee/xml/ns/persistence/persistence_3_0.xsd"
+             version="3.0">
+
+    <persistence-unit name="CabinetMedicalPU" transaction-type="JTA">
+
+        <!-- Provider -->
+        <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
+
+        <!-- Data Source -->
+        <jta-data-source>java:jboss/datasources/CabinetMedicalDS</jta-data-source>
+
+        <!-- Entities -->
+        <class>tn.isims.cabinet.entity.Patient</class>
+        <class>tn.isims.cabinet.entity.Medecin</class>
+        <class>tn.isims.cabinet.entity.RendezVous</class>
+
+        <!-- Properties -->
+        <properties>
+            <!-- Hibernate Properties -->
+            <property name="hibernate.dialect" value="org.hibernate.dialect.MySQLDialect"/>
+            <property name="hibernate.hbm2ddl.auto" value="update"/>
+            <property name="hibernate.show_sql" value="true"/>
+            <property name="hibernate.format_sql" value="true"/>
+
+            <!-- Jakarta Persistence Properties -->
+            <property name="jakarta.persistence.schema-generation.database.action" value="update"/>
+            <property name="jakarta.persistence.schema-generation.create-database-schemas" value="true"/>
+
+            <!-- Logging -->
+            <property name="hibernate.log_level" value="INFO"/>
+        </properties>
+
+    </persistence-unit>
+
+</persistence>
