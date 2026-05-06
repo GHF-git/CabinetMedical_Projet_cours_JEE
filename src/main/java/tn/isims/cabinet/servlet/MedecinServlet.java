@@ -6,6 +6,7 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import tn.isims.cabinet.ejb.medecin.MedecinServiceLocal;
 import tn.isims.cabinet.entity.Medecin;
 import tn.isims.cabinet.entity.Patient;
@@ -13,9 +14,6 @@ import tn.isims.cabinet.entity.Patient;
 import java.io.IOException;
 import java.util.List;
 
-/**
- * Servlet pour la gestion des médecins
- */
 @WebServlet({"/medecins", "/medecins/*"})
 public class MedecinServlet extends HttpServlet {
 
@@ -24,159 +22,167 @@ public class MedecinServlet extends HttpServlet {
     @EJB(beanName = "MedecinService")
     private MedecinServiceLocal medecinService;
 
+    // ── GET ───────────────────────────────────────────────────────────────────
     @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+    protected void doGet(HttpServletRequest req, HttpServletResponse res)
             throws ServletException, IOException {
 
-        String pathInfo = request.getPathInfo();
-        String action = pathInfo != null ? pathInfo.substring(1) : "";
+        transferFlash(req);   // move session flash → request attributes
+
+        String pathInfo = req.getPathInfo();
+        String action   = (pathInfo != null && pathInfo.length() > 1)
+                          ? pathInfo.substring(1) : "";
 
         switch (action) {
-            case "add":
-                afficherFormulaireAjout(request, response);
-                break;
-            case "edit":
-                afficherFormulaireModification(request, response);
-                break;
-            case "search":
-                rechercherParSpecialite(request, response);
-                break;
-            case "patients":
-                afficherPatientsDuMedecin(request, response);
-                break;
-            case "delete":
-                supprimerMedecin(request, response);
-                break;
-            default:
-                listerMedecins(request, response);
+            case "add"      -> afficherFormulaireAjout(req, res);
+            case "edit"     -> afficherFormulaireModification(req, res);
+            case "search"   -> rechercherParSpecialite(req, res);
+            case "patients" -> afficherPatientsDuMedecin(req, res);
+            case "delete"   -> supprimerMedecin(req, res);
+            default         -> listerMedecins(req, res);
         }
     }
 
+    // ── POST ──────────────────────────────────────────────────────────────────
     @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+    protected void doPost(HttpServletRequest req, HttpServletResponse res)
             throws ServletException, IOException {
 
-        String pathInfo = request.getPathInfo();
-        String pathAction = (pathInfo != null && pathInfo.length() > 1) ? pathInfo.substring(1) : "";
-        String paramAction = request.getParameter("action");
-        String action = !pathAction.isEmpty() ? pathAction : (paramAction != null ? paramAction : "");
+        String pathInfo    = req.getPathInfo();
+        String pathAction  = (pathInfo != null && pathInfo.length() > 1)
+                             ? pathInfo.substring(1) : "";
+        String paramAction = req.getParameter("action");
+        String action      = !pathAction.isEmpty() ? pathAction
+                             : (paramAction != null ? paramAction : "");
 
         switch (action) {
-            case "add":
-            case "save":
-                sauvegarderMedecin(request, response);
-                break;
-            case "delete":
-                supprimerMedecin(request, response);
-                break;
-            default:
-                response.sendRedirect(request.getContextPath() + "/medecins");
+            case "add", "save", "edit" -> sauvegarderMedecin(req, res);
+            case "delete"              -> supprimerMedecin(req, res);
+            default                    -> res.sendRedirect(
+                                              req.getContextPath() + "/medecins");
         }
     }
 
-    private void listerMedecins(HttpServletRequest request, HttpServletResponse response)
+    // ── LIST ──────────────────────────────────────────────────────────────────
+    private void listerMedecins(HttpServletRequest req, HttpServletResponse res)
             throws ServletException, IOException {
-        List<Medecin> medecins = medecinService.listerTousLesMedecins();
-        List<String> specialites = medecinService.listerSpecialites();
-
-        request.setAttribute("medecins", medecins);
-        request.setAttribute("specialites", specialites);
-        request.getRequestDispatcher("/WEB-INF/views/medecins/liste.jsp").forward(request, response);
+        req.setAttribute("medecins",    medecinService.listerTousLesMedecins());
+        req.setAttribute("specialites", medecinService.listerSpecialites());
+        req.getRequestDispatcher("/WEB-INF/views/medecins/liste.jsp").forward(req, res);
     }
 
-    private void rechercherParSpecialite(HttpServletRequest request, HttpServletResponse response)
+    // ── SEARCH ────────────────────────────────────────────────────────────────
+    private void rechercherParSpecialite(HttpServletRequest req, HttpServletResponse res)
             throws ServletException, IOException {
-        String specialite = request.getParameter("specialite");
-        List<Medecin> medecins;
-
-        if (specialite != null && !specialite.trim().isEmpty()) {
-            medecins = medecinService.rechercherParSpecialite(specialite);
-        } else {
-            medecins = medecinService.listerTousLesMedecins();
-        }
-
-        List<String> specialites = medecinService.listerSpecialites();
-
-        request.setAttribute("medecins", medecins);
-        request.setAttribute("specialites", specialites);
-        request.setAttribute("specialiteSelectionnee", specialite);
-        request.getRequestDispatcher("/WEB-INF/views/medecins/liste.jsp").forward(request, response);
+        String specialite = req.getParameter("specialite");
+        List<Medecin> medecins = (specialite != null && !specialite.trim().isEmpty())
+            ? medecinService.rechercherParSpecialite(specialite)
+            : medecinService.listerTousLesMedecins();
+        req.setAttribute("medecins",              medecins);
+        req.setAttribute("specialites",           medecinService.listerSpecialites());
+        req.setAttribute("specialiteSelectionnee", specialite);
+        req.getRequestDispatcher("/WEB-INF/views/medecins/liste.jsp").forward(req, res);
     }
 
-    private void afficherPatientsDuMedecin(HttpServletRequest request, HttpServletResponse response)
+    // ── PATIENTS DU MÉDECIN ───────────────────────────────────────────────────
+    private void afficherPatientsDuMedecin(HttpServletRequest req, HttpServletResponse res)
             throws ServletException, IOException {
-        String idStr = request.getParameter("id");
-        if (idStr != null) {
-            Long id = Long.parseLong(idStr);
-            Medecin medecin = medecinService.trouverMedecinParId(id);
-            List<Patient> patients = medecinService.obtenirPatientsDuMedecin(id);
-
-            request.setAttribute("medecin", medecin);
-            request.setAttribute("patients", patients);
-            request.getRequestDispatcher("/WEB-INF/views/medecins/patients.jsp").forward(request, response);
-        } else {
-            response.sendRedirect(request.getContextPath() + "/medecins");
-        }
-    }
-
-    private void afficherFormulaireAjout(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-        request.getRequestDispatcher("/WEB-INF/views/medecins/ajouter.jsp").forward(request, response);
-    }
-
-    private void afficherFormulaireModification(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-        String idStr = request.getParameter("id");
-        if (idStr != null) {
-            Long id = Long.parseLong(idStr);
-            Medecin medecin = medecinService.trouverMedecinParId(id);
-            request.setAttribute("medecin", medecin);
-        }
-        request.getRequestDispatcher("/WEB-INF/views/medecins/modifier.jsp").forward(request, response);
-    }
-
-    private void sauvegarderMedecin(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
+        String idStr = req.getParameter("id");
+        if (idStr == null) { res.sendRedirect(req.getContextPath() + "/medecins"); return; }
         try {
-            String idStr = request.getParameter("id");
-            String nom = request.getParameter("nom");
-            String prenom = request.getParameter("prenom");
-            String specialite = request.getParameter("specialite");
-            String email = request.getParameter("email");
+            Long    id      = Long.parseLong(idStr);
+            Medecin medecin = medecinService.trouverMedecinParId(id);
+            // Bug fix: use a dedicated JPA query instead of lazy collection
+            List<Patient> patients = medecinService.obtenirPatientsDuMedecin(id);
+            req.setAttribute("medecin",  medecin);
+            req.setAttribute("patients", patients);
+        } catch (Exception e) {
+            req.setAttribute("erreur", "Erreur: " + e.getMessage());
+        }
+        req.getRequestDispatcher("/WEB-INF/views/medecins/patients.jsp").forward(req, res);
+    }
 
-            if (idStr == null || idStr.isEmpty()) {
-                // Ajout d'un nouveau médecin
-                Medecin medecin = new Medecin(nom, prenom, specialite, email);
-                medecinService.ajouterMedecin(medecin);
-                request.setAttribute("message", "Médecin ajouté avec succès!");
+    // ── FORMS ─────────────────────────────────────────────────────────────────
+    private void afficherFormulaireAjout(HttpServletRequest req, HttpServletResponse res)
+            throws ServletException, IOException {
+        req.getRequestDispatcher("/WEB-INF/views/medecins/ajouter.jsp").forward(req, res);
+    }
+
+    private void afficherFormulaireModification(HttpServletRequest req, HttpServletResponse res)
+            throws ServletException, IOException {
+        String idStr = req.getParameter("id");
+        if (idStr != null) {
+            Medecin m = medecinService.trouverMedecinParId(Long.parseLong(idStr));
+            req.setAttribute("medecin", m);
+        }
+        req.getRequestDispatcher("/WEB-INF/views/medecins/modifier.jsp").forward(req, res);
+    }
+
+    // ── SAVE (add OR edit) ────────────────────────────────────────────────────
+    private void sauvegarderMedecin(HttpServletRequest req, HttpServletResponse res)
+            throws IOException {
+        try {
+            String idStr     = req.getParameter("id");
+            String nom       = req.getParameter("nom");
+            String prenom    = req.getParameter("prenom");
+            String specialite = req.getParameter("specialite");
+            String email     = req.getParameter("email");
+
+            if (nom == null || nom.trim().isEmpty()) {
+                flash(req, "error", "Le nom est obligatoire.");
+                res.sendRedirect(req.getContextPath() + "/medecins/add");
+                return;
+            }
+
+            Medecin m = new Medecin(nom.trim(), prenom.trim(), specialite.trim(), email.trim());
+
+            if (idStr == null || idStr.trim().isEmpty()) {
+                medecinService.ajouterMedecin(m);
+                flash(req, "success", "Médecin Dr. " + prenom + " " + nom + " ajouté avec succès !");
             } else {
-                // Modification
-                Long id = Long.parseLong(idStr);
-                Medecin medecinModifie = new Medecin(nom, prenom, specialite, email);
-                medecinService.modifierMedecin(id, medecinModifie);
-                request.setAttribute("message", "Médecin modifié avec succès!");
+                medecinService.modifierMedecin(Long.parseLong(idStr), m);
+                flash(req, "success", "Médecin modifié avec succès !");
             }
         } catch (Exception e) {
-            request.setAttribute("erreur", "Erreur: " + e.getMessage());
+            flash(req, "error", "Erreur lors de la sauvegarde : " + e.getMessage());
         }
-
-        response.sendRedirect(request.getContextPath() + "/medecins");
+        // POST → Redirect → GET  (never setAttribute on redirect)
+        res.sendRedirect(req.getContextPath() + "/medecins");
     }
 
-    private void supprimerMedecin(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-        String idStr = request.getParameter("id");
+    // ── DELETE ────────────────────────────────────────────────────────────────
+    private void supprimerMedecin(HttpServletRequest req, HttpServletResponse res)
+            throws IOException {
+        String idStr = req.getParameter("id");
         if (idStr != null) {
-            Long id = Long.parseLong(idStr);
-            boolean success = medecinService.supprimerMedecin(id);
-
-            if (success) {
-                request.setAttribute("message", "Médecin supprimé avec succès!");
-            } else {
-                request.setAttribute("erreur", "Impossible de supprimer: médecin avec des rendez-vous");
+            try {
+                boolean ok = medecinService.supprimerMedecin(Long.parseLong(idStr));
+                if (ok) flash(req, "success", "Médecin supprimé avec succès.");
+                else    flash(req, "error",   "Impossible de supprimer : ce médecin a des rendez-vous.");
+            } catch (Exception e) {
+                flash(req, "error", "Erreur : " + e.getMessage());
             }
         }
+        res.sendRedirect(req.getContextPath() + "/medecins");
+    }
 
-        response.sendRedirect(request.getContextPath() + "/medecins");
+    // ── Flash helpers ─────────────────────────────────────────────────────────
+    private void flash(HttpServletRequest req, String type, String msg) {
+        HttpSession s = req.getSession();
+        s.setAttribute("flashMessage", msg);
+        s.setAttribute("flashType",    type);
+    }
+
+    private void transferFlash(HttpServletRequest req) {
+        HttpSession s = req.getSession(false);
+        if (s == null) return;
+        String msg  = (String) s.getAttribute("flashMessage");
+        String type = (String) s.getAttribute("flashType");
+        if (msg != null) {
+            if ("error".equals(type)) req.setAttribute("erreur",  msg);
+            else                      req.setAttribute("message", msg);
+            s.removeAttribute("flashMessage");
+            s.removeAttribute("flashType");
+        }
     }
 }

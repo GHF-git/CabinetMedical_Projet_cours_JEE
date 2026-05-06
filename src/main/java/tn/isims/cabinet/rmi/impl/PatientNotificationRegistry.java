@@ -2,59 +2,65 @@ package tn.isims.cabinet.rmi.impl;
 
 import tn.isims.cabinet.rmi.callback.PatientCallback;
 
-import java.util.concurrent.ConcurrentHashMap;
+import java.rmi.RemoteException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Registre central pour gérer les callbacks des patients
- * Thread-safe pour supporter plusieurs connexions simultanées
+ * Registre central thread-safe pour les callbacks RMI des patients.
+ * Garde aussi la date de connexion pour affichage dans le tableau de bord.
  */
 public class PatientNotificationRegistry {
 
-    private static final Map<Long, PatientCallback> CALLBACKS = new ConcurrentHashMap<>();
+    private static final DateTimeFormatter FMT =
+        DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
 
-    /**
-     * Enregistre un callback pour un patient
-     * @param patientId ID du patient
-     * @param callback Interface de callback
-     */
+    // Callback par patientId
+    private static final Map<Long, PatientCallback> CALLBACKS  = new ConcurrentHashMap<>();
+    // Date de connexion par patientId
+    private static final Map<Long, String>          CONNEXIONS = new ConcurrentHashMap<>();
+    // Nom affiché par patientId (optionnel)
+    private static final Map<Long, String>          NOMS       = new ConcurrentHashMap<>();
+
     public static void enregistrer(Long patientId, PatientCallback callback) {
-        CALLBACKS.put(patientId, callback);
-        System.out.println("[REGISTRY] Patient " + patientId + " enregistré pour notifications");
+        enregistrer(patientId, callback, null);
     }
 
-    /**
-     * Supprime l'enregistrement d'un patient
-     * @param patientId ID du patient
-     */
+    public static void enregistrer(Long patientId, PatientCallback callback, String nom) {
+        CALLBACKS.put(patientId,  callback);
+        CONNEXIONS.put(patientId, LocalDateTime.now().format(FMT));
+        if (nom != null) NOMS.put(patientId, nom);
+    }
+
     public static void desinscrire(Long patientId) {
         CALLBACKS.remove(patientId);
-        System.out.println("[REGISTRY] Patient " + patientId + " désinscrit des notifications");
+        CONNEXIONS.remove(patientId);
+        NOMS.remove(patientId);
     }
 
-    /**
-     * Récupère le callback d'un patient
-     * @param patientId ID du patient
-     * @return Le callback ou null si non enregistré
-     */
     public static PatientCallback getCallback(Long patientId) {
         return CALLBACKS.get(patientId);
     }
 
-    /**
-     * Vérifie si un patient est enregistré
-     * @param patientId ID du patient
-     * @return true si enregistré
-     */
     public static boolean estEnregistre(Long patientId) {
         return CALLBACKS.containsKey(patientId);
     }
 
-    /**
-     * Retourne le nombre de patients enregistrés
-     * @return Nombre de callbacks actifs
-     */
-    public static int getNombreEnregistrements() {
+    public static int getNombreConnectes() {
         return CALLBACKS.size();
+    }
+
+    public static Map<Long, PatientCallback> getTousLesCallbacks() {
+        return CALLBACKS;
+    }
+
+    public static String getDateConnexion(Long patientId) {
+        return CONNEXIONS.getOrDefault(patientId, "?");
+    }
+
+    public static String getNom(Long patientId) {
+        return NOMS.getOrDefault(patientId, "Patient #" + patientId);
     }
 }

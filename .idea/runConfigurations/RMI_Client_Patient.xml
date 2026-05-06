@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="RMI Client (Patient)" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="tn.isims.cabinet.rmi.impl.RMIClientApplication" />
+    <option name="VM_PARAMETERS" value="-Djava.rmi.server.hostname=127.0.0.1" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <option name="INCLUDE_PROVIDED_SCOPE" value="true" />
+    <module name="CabinetMedical" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

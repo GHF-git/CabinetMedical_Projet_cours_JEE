@@ -85,6 +85,15 @@
             <version>2.0.7</version>
         </dependency>
 
+        <!-- WildFly Client - required for RMI server JNDI lookup -->
+        <dependency>
+            <groupId>org.wildfly</groupId>
+            <artifactId>jboss-client</artifactId>
+            <version>32.0.1.Final</version>
+            <scope>system</scope>
+            <systemPath>/Users/7abcha9la/wildfly/bin/client/jboss-client.jar</systemPath>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

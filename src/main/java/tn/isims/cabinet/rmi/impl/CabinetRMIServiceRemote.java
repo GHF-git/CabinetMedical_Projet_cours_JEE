@@ -1,5 +1,7 @@
 package tn.isims.cabinet.rmi.impl;
 
+import tn.isims.cabinet.entity.Medecin;
+import tn.isims.cabinet.entity.Patient;
 import tn.isims.cabinet.entity.RendezVous;
 import tn.isims.cabinet.rmi.callback.PatientCallback;
 
@@ -67,4 +69,10 @@ public interface CabinetRMIServiceRemote extends Remote {
      * @throws RemoteException
      */
     String annulerRendezVousRMI(Long rdvId) throws RemoteException;
+
+    /** Retourne la liste de tous les médecins disponibles */
+    List<Medecin> listerMedecins() throws RemoteException;
+
+    /** Retourne la liste de tous les patients */
+    List<Patient> listerPatients() throws RemoteException;
 }

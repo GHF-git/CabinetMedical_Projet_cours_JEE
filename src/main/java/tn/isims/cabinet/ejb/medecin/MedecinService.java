@@ -9,9 +9,6 @@ import tn.isims.cabinet.entity.Patient;
 
 import java.util.List;
 
-/**
- * EJB Stateless pour la gestion des médecins
- */
 @Stateless(mappedName = "MedecinService")
 public class MedecinService implements MedecinServiceRemote, MedecinServiceLocal {
 
@@ -20,8 +17,8 @@ public class MedecinService implements MedecinServiceRemote, MedecinServiceLocal
 
     @Override
     public List<Medecin> listerTousLesMedecins() {
-        TypedQuery<Medecin> query = em.createQuery("SELECT m FROM Medecin m ORDER BY m.nom", Medecin.class);
-        return query.getResultList();
+        return em.createQuery("SELECT m FROM Medecin m ORDER BY m.nom", Medecin.class)
+                 .getResultList();
     }
 
     @Override
@@ -32,64 +29,66 @@ public class MedecinService implements MedecinServiceRemote, MedecinServiceLocal
     @Override
     public Medecin ajouterMedecin(Medecin medecin) {
         em.persist(medecin);
+        em.flush();   // force immediate INSERT so errors surface in the EJB
         return medecin;
     }
 
     @Override
     public Medecin modifierMedecin(Long id, Medecin medecinModifie) {
-        Medecin medecin = em.find(Medecin.class, id);
-        if (medecin != null) {
-            medecin.setNom(medecinModifie.getNom());
-            medecin.setPrenom(medecinModifie.getPrenom());
-            medecin.setSpecialite(medecinModifie.getSpecialite());
-            medecin.setEmail(medecinModifie.getEmail());
-            em.merge(medecin);
+        Medecin m = em.find(Medecin.class, id);
+        if (m != null) {
+            m.setNom(medecinModifie.getNom());
+            m.setPrenom(medecinModifie.getPrenom());
+            m.setSpecialite(medecinModifie.getSpecialite());
+            m.setEmail(medecinModifie.getEmail());
+            em.merge(m);
+            em.flush();
         }
-        return medecin;
+        return m;
     }
 
     @Override
     public boolean supprimerMedecin(Long id) {
-        Medecin medecin = em.find(Medecin.class, id);
-        if (medecin != null) {
-            // Vérifier s'il y a des rendez-vous
-            if (!medecin.getRendezVous().isEmpty()) {
-                return false; // Ne peut pas supprimer
-            }
-            em.remove(medecin);
-            return true;
-        }
-        return false;
+        Medecin m = em.find(Medecin.class, id);
+        if (m == null) return false;
+
+        // Count active appointments — do NOT touch lazy collection
+        Long count = em.createQuery(
+            "SELECT COUNT(r) FROM RendezVous r WHERE r.medecin.id = :id AND r.statut = 'PLANIFIE'",
+            Long.class)
+            .setParameter("id", id)
+            .getSingleResult();
+
+        if (count > 0) return false;
+
+        em.remove(m);
+        return true;
     }
 
     @Override
     public List<Medecin> rechercherParSpecialite(String specialite) {
-        TypedQuery<Medecin> query = em.createQuery(
+        return em.createQuery(
             "SELECT m FROM Medecin m WHERE LOWER(m.specialite) LIKE :spec ORDER BY m.nom",
-            Medecin.class
-        );
-        query.setParameter("spec", "%" + specialite.toLowerCase() + "%");
-        return query.getResultList();
+            Medecin.class)
+            .setParameter("spec", "%" + specialite.toLowerCase() + "%")
+            .getResultList();
     }
 
     @Override
     public List<Patient> obtenirPatientsDuMedecin(Long medecinId) {
-        Medecin medecin = em.find(Medecin.class, medecinId);
-        if (medecin != null) {
-            return medecin.getRendezVous().stream()
-                    .map(rdv -> rdv.getPatient())
-                    .distinct()
-                    .toList();
-        }
-        return List.of();
+        // Bug fix: direct JPQL query — never access lazy collections outside EJB transaction
+        return em.createQuery(
+            "SELECT DISTINCT r.patient FROM RendezVous r WHERE r.medecin.id = :id ORDER BY r.patient.nom",
+            Patient.class)
+            .setParameter("id", medecinId)
+            .getResultList();
     }
 
     @Override
     public List<String> listerSpecialites() {
-        TypedQuery<String> query = em.createQuery(
+        return em.createQuery(
             "SELECT DISTINCT m.specialite FROM Medecin m ORDER BY m.specialite",
-            String.class
-        );
-        return query.getResultList();
+            String.class)
+            .getResultList();
     }
 }
