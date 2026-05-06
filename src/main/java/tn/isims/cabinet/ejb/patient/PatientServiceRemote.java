@@ -24,4 +24,6 @@ public interface PatientServiceRemote {
     List<Patient> rechercherParNomOuEmail(String recherche);
 
     Patient trouverPatientParEmail(String email);
+
+    List<Patient> listerPatientsPourRMI();
 }

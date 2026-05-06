@@ -97,7 +97,7 @@ public class CabinetRMIService extends UnicastRemoteObject implements CabinetRMI
     // ── Liste patients (implémentation manquante ajoutée) ─────────────────────
     @Override
     public List<Patient> listerPatients() throws RemoteException {
-        try { return getPatientService().listerTousLesPatients(); }
+        try { return getPatientService().listerPatientsPourRMI(); }
         catch (Exception e) { throw new RemoteException("Erreur patients: " + e.getMessage(), e); }
     }
 

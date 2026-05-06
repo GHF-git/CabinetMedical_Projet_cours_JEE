@@ -13,4 +13,5 @@ public interface PatientServiceLocal {
     boolean supprimerPatient(Long id);
     List<Patient> rechercherParNomOuEmail(String recherche);
     Patient trouverPatientParEmail(String email);
+    List<Patient> listerPatientsPourRMI();
 }

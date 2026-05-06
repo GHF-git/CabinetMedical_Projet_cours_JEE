@@ -3,13 +3,19 @@ package tn.isims.cabinet.ejb.patient;
 import jakarta.ejb.Stateless;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import jakarta.persistence.TypedQuery;
 import tn.isims.cabinet.entity.Patient;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
- * EJB Stateless pour la gestion des patients
+ * EJB Stateless — Gestion des Patients.
+ *
+ * SERIALIZATION FIX: Every Patient returned via a Remote interface
+ * must be a plain POJO copy with no Hibernate proxy attachment.
+ * We build new Patient instances with scalar fields only and
+ * an empty ArrayList for rendezVous — never a PersistentBag.
  */
 @Stateless(mappedName = "PatientService")
 public class PatientService implements PatientServiceRemote, PatientServiceLocal {
@@ -19,71 +25,84 @@ public class PatientService implements PatientServiceRemote, PatientServiceLocal
 
     @Override
     public List<Patient> listerTousLesPatients() {
-        TypedQuery<Patient> query = em.createQuery("SELECT p FROM Patient p ORDER BY p.nom", Patient.class);
-        return query.getResultList();
+        return copyList(em.createQuery(
+                "SELECT p FROM Patient p ORDER BY p.nom", Patient.class)
+                .getResultList());
     }
 
     @Override
     public Patient trouverPatientParId(Long id) {
-        return em.find(Patient.class, id);
+        return copy(em.find(Patient.class, id));
+    }
+
+    @Override
+    public List<Patient> rechercherParNomOuEmail(String recherche) {
+        return copyList(em.createQuery(
+                "SELECT p FROM Patient p WHERE LOWER(p.nom) LIKE :r OR LOWER(p.email) LIKE :r",
+                Patient.class)
+                .setParameter("r", "%" + recherche.toLowerCase() + "%")
+                .getResultList());
+    }
+
+    @Override
+    public Patient trouverPatientParEmail(String email) {
+        List<Patient> r = em.createQuery(
+                "SELECT p FROM Patient p WHERE p.email = :email", Patient.class)
+                .setParameter("email", email).getResultList();
+        return r.isEmpty() ? null : copy(r.get(0));
     }
 
     @Override
     public Patient ajouterPatient(Patient patient) {
         em.persist(patient);
-        return patient;
+        em.flush();
+        return copy(patient);
     }
 
     @Override
-    public Patient modifierPatient(Long id, Patient patientModifie) {
-        Patient patient = em.find(Patient.class, id);
-        if (patient != null) {
-            patient.setNom(patientModifie.getNom());
-            patient.setPrenom(patientModifie.getPrenom());
-            patient.setEmail(patientModifie.getEmail());
-            patient.setTelephone(patientModifie.getTelephone());
-            patient.setDateNaissance(patientModifie.getDateNaissance());
-            em.merge(patient);
+    public Patient modifierPatient(Long id, Patient mod) {
+        Patient p = em.find(Patient.class, id);
+        if (p != null) {
+            p.setNom(mod.getNom());
+            p.setPrenom(mod.getPrenom());
+            p.setEmail(mod.getEmail());
+            p.setTelephone(mod.getTelephone());
+            p.setDateNaissance(mod.getDateNaissance());
+            em.merge(p);
+            em.flush();
         }
-        return patient;
+        return copy(p);
     }
 
     @Override
     public boolean supprimerPatient(Long id) {
-        Patient patient = em.find(Patient.class, id);
-        if (patient != null) {
-            // Vérifier s'il y a des rendez-vous actifs
-            boolean aDesRendezVousActifs = patient.getRendezVous().stream()
-                    .anyMatch(rdv -> rdv.getStatut() == tn.isims.cabinet.entity.RendezVous.Statut.PLANIFIE);
-
-            if (aDesRendezVousActifs) {
-                return false; // Ne peut pas supprimer
-            }
-
-            em.remove(patient);
-            return true;
-        }
-        return false;
+        Patient p = em.find(Patient.class, id);
+        if (p == null) return false;
+        // JPQL count — never touch the lazy collection
+        Long count = em.createQuery(
+                "SELECT COUNT(r) FROM RendezVous r WHERE r.patient.id = :id AND r.statut = 'PLANIFIE'",
+                Long.class).setParameter("id", id).getSingleResult();
+        if (count > 0) return false;
+        em.remove(em.merge(p));
+        return true;
     }
 
     @Override
-    public List<Patient> rechercherParNomOuEmail(String recherche) {
-        TypedQuery<Patient> query = em.createQuery(
-            "SELECT p FROM Patient p WHERE LOWER(p.nom) LIKE :rech OR LOWER(p.email) LIKE :rech",
-            Patient.class
-        );
-        query.setParameter("rech", "%" + recherche.toLowerCase() + "%");
-        return query.getResultList();
+    public List<Patient> listerPatientsPourRMI() {
+        return listerTousLesPatients();
     }
 
-    @Override
-    public Patient trouverPatientParEmail(String email) {
-        TypedQuery<Patient> query = em.createQuery(
-            "SELECT p FROM Patient p WHERE p.email = :email",
-            Patient.class
-        );
-        query.setParameter("email", email);
-        List<Patient> results = query.getResultList();
-        return results.isEmpty() ? null : results.get(0);
+    // ── Deep-copy helpers ────────────────────────────────────────────────────
+    private Patient copy(Patient p) {
+        if (p == null) return null;
+        Patient c = new Patient(p.getNom(), p.getPrenom(),
+                p.getEmail(), p.getTelephone(), p.getDateNaissance());
+        c.setId(p.getId());
+        c.setRendezVous(new ArrayList<>());  // plain ArrayList — no Hibernate proxy
+        return c;
+    }
+
+    private List<Patient> copyList(List<Patient> list) {
+        return list.stream().map(this::copy).collect(Collectors.toList());
     }
 }
