@@ -1,8 +1,6 @@
 package tn.isims.cabinet.rmi.impl;
 
 import tn.isims.cabinet.rmi.callback.PatientCallback;
-
-import java.rmi.RemoteException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;

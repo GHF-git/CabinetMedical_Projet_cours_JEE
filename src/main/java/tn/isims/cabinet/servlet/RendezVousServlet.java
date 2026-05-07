@@ -10,16 +10,13 @@ import jakarta.servlet.http.HttpSession;
 import tn.isims.cabinet.ejb.medecin.MedecinServiceLocal;
 import tn.isims.cabinet.ejb.patient.PatientServiceLocal;
 import tn.isims.cabinet.ejb.rendezvous.RendezVousServiceLocal;
-import tn.isims.cabinet.entity.Medecin;
-import tn.isims.cabinet.entity.Patient;
 import tn.isims.cabinet.entity.RendezVous;
 
+import jakarta.ejb.EJBException;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.List;
-
 @WebServlet({"/rendezvous", "/rendezvous/*"})
 public class RendezVousServlet extends HttpServlet {
 
@@ -57,6 +54,9 @@ public class RendezVousServlet extends HttpServlet {
                 break;
             case "passes":
                 listerRendezVousPasses(request, response);
+                break;
+            case "calendar":
+                afficherCalendrier(request, response);
                 break;
             case "cancel":
                 // Support GET cancel via ?id=
@@ -124,6 +124,12 @@ public class RendezVousServlet extends HttpServlet {
         req.getRequestDispatcher("/WEB-INF/views/rendezvous/liste.jsp").forward(req, res);
     }
 
+    private void afficherCalendrier(HttpServletRequest req, HttpServletResponse res)
+            throws ServletException, IOException {
+        req.setAttribute("rendezVous", rendezVousService.listerTousLesRendezVous());
+        req.getRequestDispatcher("/WEB-INF/views/rendezvous/calendrier.jsp").forward(req, res);
+    }
+
     // ── Forms ────────────────────────────────────────────────────
 
     private void afficherFormulaireCreation(HttpServletRequest req, HttpServletResponse res)
@@ -163,6 +169,9 @@ public class RendezVousServlet extends HttpServlet {
             flashSuccess(req, "Rendez-vous #" + rdv.getId() + " créé avec succès !");
         } catch (DateTimeParseException e) {
             flashError(req, "Format de date invalide.");
+        } catch (EJBException e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            flashError(req, cause.getMessage());
         } catch (Exception e) {
             flashError(req, "Erreur : " + e.getMessage());
         }
@@ -177,6 +186,9 @@ public class RendezVousServlet extends HttpServlet {
             RendezVous rdv = rendezVousService.modifierHoraire(id, date);
             if (rdv != null) flashSuccess(req, "Rendez-vous modifié avec succès !");
             else flashError(req, "Rendez-vous introuvable ou déjà clôturé.");
+        } catch (EJBException e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            flashError(req, cause.getMessage());
         } catch (Exception e) {
             flashError(req, "Erreur : " + e.getMessage());
         }

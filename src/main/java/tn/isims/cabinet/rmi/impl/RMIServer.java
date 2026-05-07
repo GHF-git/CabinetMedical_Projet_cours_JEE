@@ -1,6 +1,7 @@
 package tn.isims.cabinet.rmi.impl;
 
 import tn.isims.cabinet.rmi.callback.PatientCallback;
+import tn.isims.cabinet.rmi.impl.WebNotificationRegistry;
 
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
@@ -77,6 +78,7 @@ public class RMIServer {
                         log("Arrêt du serveur RMI...");
                         try { registry.unbind(SERVICE_NAME); } catch (Exception ignored) {}
                         log("✅ Serveur arrêté proprement. Au revoir.");
+                        sc.close();
                         System.exit(0);
                     }
                     case "" -> {}  // ignore empty lines
@@ -92,32 +94,54 @@ public class RMIServer {
 
     // ── Status ────────────────────────────────────────────────────────────────
     private static void afficherStatut() {
+        int rmiClients = PatientNotificationRegistry.getNombreConnectes();
+        int webClients = WebNotificationRegistry.getTotalWebClients();
         separateur();
         System.out.printf("  📊  STATUT DU SERVEUR RMI — %s%n", maintenant());
-        System.out.printf("  %-25s %s%n", "Port RMI:",     RMI_PORT);
-        System.out.printf("  %-25s %s%n", "Service:",      SERVICE_NAME);
-        System.out.printf("  %-25s %s%n", "Hostname:",     "127.0.0.1");
-        System.out.printf("  %-25s %d patient(s)%n",
-            "Clients connectés:", PatientNotificationRegistry.getNombreConnectes());
+        System.out.printf("  %-30s %s%n", "Port RMI:",       RMI_PORT);
+        System.out.printf("  %-30s %s%n", "Service:",        SERVICE_NAME);
+        System.out.printf("  %-30s %s%n", "Hostname:",       "127.0.0.1");
+        System.out.printf("  %-30s %d patient(s) (terminal)%n",  "Clients RMI:",  rmiClients);
+        System.out.printf("  %-30s %d onglet(s) (navigateur)%n", "Clients Web:",  webClients);
+        System.out.printf("  %-30s %d total%n", "Total connectés:", rmiClients + webClients);
         separateur();
     }
 
     // ── Clients ───────────────────────────────────────────────────────────────
     private static void afficherClients() {
         separateur();
-        Map<Long, PatientCallback> clients = PatientNotificationRegistry.getTousLesCallbacks();
-        if (clients.isEmpty()) {
-            System.out.println("  Aucun patient connecté.");
+        Map<Long, PatientCallback> rmiClients = PatientNotificationRegistry.getTousLesCallbacks();
+        Map<Long, java.util.List<WebNotificationRegistry.SseClient>> webClients =
+            WebNotificationRegistry.getAllClients();
+
+        System.out.println("  📱 CLIENTS TERMINAL (RMI)");
+        if (rmiClients.isEmpty()) {
+            System.out.println("     Aucun client terminal connecté.");
         } else {
-            System.out.printf("  %-6s  %-22s  %-22s  %s%n",
+            System.out.printf("     %-6s  %-22s  %-22s  %s%n",
                 "ID", "Nom", "Connecté depuis", "Joignable");
-            System.out.println("  " + "─".repeat(70));
-            for (Long id : clients.keySet()) {
-                String nom    = PatientNotificationRegistry.getNom(id);
-                String depuis = PatientNotificationRegistry.getDateConnexion(id);
-                boolean ok    = testerCallback(id);
-                System.out.printf("  %-6d  %-22s  %-22s  %s%n",
-                    id, nom, depuis, ok ? "✅ OUI" : "❌ Déconnecté");
+            System.out.println("     " + "─".repeat(65));
+            for (Long id : rmiClients.keySet()) {
+                System.out.printf("     %-6d  %-22s  %-22s  %s%n",
+                    id,
+                    PatientNotificationRegistry.getNom(id),
+                    PatientNotificationRegistry.getDateConnexion(id),
+                    testerCallback(id) ? "✅ OUI" : "❌ Mort");
+            }
+        }
+
+        System.out.println();
+        System.out.println("  🌐 CLIENTS WEB (Navigateur/SSE)");
+        if (webClients.isEmpty()) {
+            System.out.println("     Aucun client web connecté.");
+        } else {
+            System.out.printf("     %-6s  %-22s  %s%n", "ID", "Nom", "Onglets ouverts");
+            System.out.println("     " + "─".repeat(45));
+            for (Long id : webClients.keySet()) {
+                System.out.printf("     %-6d  %-22s  %d onglet(s)%n",
+                    id,
+                    WebNotificationRegistry.getName(id),
+                    WebNotificationRegistry.getConnectionCount(id));
             }
         }
         separateur();

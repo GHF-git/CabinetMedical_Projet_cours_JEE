@@ -29,7 +29,7 @@ public class CabinetRMIService extends UnicastRemoteObject implements CabinetRMI
     private static final String MEDECIN_JNDI =
         "ejb:/CabinetMedical/MedecinService!tn.isims.cabinet.ejb.medecin.MedecinServiceRemote";
     private static final String RDV_JNDI =
-        "ejb:/CabinetMedical/RendezVousService!tn.isims.cabinet.ejb.rendezvous.RendezVousServiceRemote?stateful";
+        "ejb:/CabinetMedical/RendezVousService!tn.isims.cabinet.ejb.rendezvous.RendezVousServiceRemote";
 
     public CabinetRMIService() throws RemoteException { super(); }
 

@@ -1,6 +1,6 @@
 package tn.isims.cabinet.ejb.rendezvous;
 
-import jakarta.ejb.Stateful;
+import jakarta.ejb.Stateless;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
@@ -9,7 +9,9 @@ import tn.isims.cabinet.entity.Patient;
 import tn.isims.cabinet.entity.RendezVous;
 import tn.isims.cabinet.rmi.callback.PatientCallback;
 import tn.isims.cabinet.rmi.impl.PatientNotificationRegistry;
+import tn.isims.cabinet.rmi.impl.WebNotificationRegistry;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -30,16 +32,48 @@ import java.util.stream.Collectors;
  *   using only scalar fields and empty ArrayLists for the collections.
  *   The copy is a real POJO with no Hibernate attachment whatsoever.
  */
-@Stateful(mappedName = "RendezVousService")
+@Stateless(mappedName = "RendezVousService")
 public class RendezVousService implements RendezVousServiceRemote, RendezVousServiceLocal {
 
     @PersistenceContext(unitName = "CabinetMedicalPU")
     private EntityManager em;
 
-    private PatientCallback patientCallback;
+    // ── VALIDATION ────────────────────────────────────────────────────────────
+    private void validerRendezVous(Long medecinId, LocalDateTime date, Long excludeRdvId) {
+        if (date.isBefore(LocalDateTime.now())) {
+            throw new IllegalArgumentException("La date du rendez-vous ne peut pas être dans le passé.");
+        }
+        if (date.getDayOfWeek() == DayOfWeek.SUNDAY) {
+            throw new IllegalArgumentException("Le cabinet est fermé le dimanche.");
+        }
+        if (date.getHour() < 8 || date.getHour() >= 18) {
+            throw new IllegalArgumentException("Les horaires d'ouverture sont de 08:00 à 18:00.");
+        }
 
-    public void setPatientCallback(PatientCallback callback) {
-        this.patientCallback = callback;
+        // Vérification de chevauchement (créneaux de 30 minutes)
+        LocalDateTime debutPlage = date.minusMinutes(29);
+        LocalDateTime finPlage = date.plusMinutes(29);
+
+        String queryStr = "SELECT COUNT(r) FROM RendezVous r WHERE r.medecin.id = :mid " +
+                          "AND r.statut = :s AND r.dateRendezVous >= :debut AND r.dateRendezVous <= :fin";
+        if (excludeRdvId != null) {
+            queryStr += " AND r.id != :excludeId";
+        }
+
+        TypedQuery<Long> query = em.createQuery(queryStr, Long.class)
+                .setParameter("mid", medecinId)
+                .setParameter("s", RendezVous.Statut.PLANIFIE)
+                .setParameter("debut", debutPlage)
+                .setParameter("fin", finPlage);
+                
+        if (excludeRdvId != null) {
+            query.setParameter("excludeId", excludeRdvId);
+        }
+
+        Long count = query.getSingleResult();
+        if (count > 0) {
+            throw new IllegalArgumentException("Le médecin a déjà un rendez-vous prévu dans ce créneau horaire.");
+        }
     }
 
     // ── CREATE ────────────────────────────────────────────────────────────────
@@ -50,6 +84,8 @@ public class RendezVousService implements RendezVousServiceRemote, RendezVousSer
         Medecin medecin = em.find(Medecin.class, medecinId);
         if (patient == null || medecin == null)
             throw new IllegalArgumentException("Patient ou Médecin introuvable");
+
+        validerRendezVous(medecinId, dateRendezVous, null);
 
         RendezVous rdv = new RendezVous(patient, medecin, dateRendezVous, motif);
         em.persist(rdv);
@@ -66,6 +102,8 @@ public class RendezVousService implements RendezVousServiceRemote, RendezVousSer
     public RendezVous modifierHoraire(Long rdvId, LocalDateTime nouvelleDate) {
         RendezVous rdv = em.find(RendezVous.class, rdvId);
         if (rdv == null || rdv.getStatut() != RendezVous.Statut.PLANIFIE) return null;
+
+        validerRendezVous(rdv.getMedecin().getId(), nouvelleDate, rdvId);
 
         String ancienne = rdv.getDateFormatted();
         rdv.setDateRendezVous(nouvelleDate);
@@ -199,17 +237,26 @@ public class RendezVousService implements RendezVousServiceRemote, RendezVousSer
 
     // ── NOTIFICATION ──────────────────────────────────────────────────────────
     private void notifier(Long patientId, String message) {
+        // 1. RMI terminal client
         try {
-            PatientCallback cb = patientCallback;
-            if (cb == null) cb = PatientNotificationRegistry.getCallback(patientId);
+            PatientCallback cb = PatientNotificationRegistry.getCallback(patientId);
             if (cb != null) {
                 cb.recevoirNotification(message);
-                System.out.println("[RMI] ✅ Notification → patient " + patientId + ": " + message);
-            } else {
-                System.out.println("[RMI] ℹ Patient " + patientId + " non connecté — notification ignorée.");
+                System.out.println("[RMI] ✅ Notification terminal → patient " + patientId + ": " + message);
             }
         } catch (Exception e) {
-            System.err.println("[RMI] ⚠ Erreur notification: " + e.getMessage());
+            System.err.println("[RMI] ⚠ Erreur notification terminal: " + e.getMessage());
+        }
+
+        // 2. Web browser SSE (patient dashboard)
+        try {
+            if (WebNotificationRegistry.isConnected(patientId)) {
+                WebNotificationRegistry.notify(patientId, message);
+                System.out.println("[WEB] ✅ Notification web → patient " + patientId
+                    + " (" + WebNotificationRegistry.getConnectionCount(patientId) + " onglet(s)): " + message);
+            }
+        } catch (Exception e) {
+            System.err.println("[WEB] ⚠ Erreur notification web: " + e.getMessage());
         }
     }
 }

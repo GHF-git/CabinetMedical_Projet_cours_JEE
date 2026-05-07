@@ -3,6 +3,7 @@ package tn.isims.cabinet.entity;
 import jakarta.persistence.*;
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @Entity
 @Table(name = "RENDEZVOUS")
@@ -71,9 +72,13 @@ public class RendezVous implements Serializable {
 
     public String getDateForInput() {
         if (dateRendezVous == null) return "";
-        return String.format("%04d-%02d-%02dT%02d:%02d",
-            dateRendezVous.getYear(), dateRendezVous.getMonthValue(),
-            dateRendezVous.getDayOfMonth(), dateRendezVous.getHour(), dateRendezVous.getMinute());
+        return dateRendezVous.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm"));
+    }
+
+    @Transient
+    public String getMotifForJson() {
+        if (motif == null) return "";
+        return motif.replace("\"", "\\\"").replace("\n", " ").replace("\r", " ");
     }
 
     public String getStatutLower() {
